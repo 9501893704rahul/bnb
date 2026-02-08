@@ -174,21 +174,7 @@ export default function checklistRenderer(config = {}) {
                 rooms = Object.values(rooms);
             }
 
-            // Calculate which rooms are complete and which should be enabled
-            let firstIncompleteIndex = null;
-            rooms.forEach((room, index) => {
-                // Ensure room.tasks is an array
-                const roomTasksArray = Array.isArray(room.tasks) ? room.tasks : Object.values(room.tasks || {});
-                const roomTasks = roomTasksArray.filter(t => room.room_tasks.includes(t.id));
-                const checkedCount = roomTasks.filter(t => t.checklist_item?.checked).length;
-                const totalCount = roomTasks.length;
-
-                // If this room is incomplete and we haven't found the first incomplete yet
-                if (firstIncompleteIndex === null && checkedCount < totalCount && totalCount > 0) {
-                    firstIncompleteIndex = index;
-                }
-            });
-
+            // All rooms are now accessible - housekeepers can skip around freely
             return `
                 <div class="space-y-6">
                     ${rooms.map((room, index) => {
@@ -198,20 +184,13 @@ export default function checklistRenderer(config = {}) {
                         const checkedCount = roomTasks.filter(t => t.checklist_item?.checked).length;
                         const totalCount = roomTasks.length;
                         const isComplete = checkedCount === totalCount && totalCount > 0;
-                        // Room is disabled if there's a previous incomplete room
-                        const isDisabled = firstIncompleteIndex !== null && index > firstIncompleteIndex;
 
                         return `
-                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 ${isDisabled ? 'opacity-60' : ''}"
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6"
                                  data-room-id="${room.id}" data-room-index="${index}">
                                 <div class="mb-6">
                                     <div class="flex items-center justify-between mb-3">
                                         <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">${room.name}</h3>
-                                        ${isDisabled ? `
-                                            <span class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                                                Complete previous rooms first
-                                            </span>
-                                        ` : ''}
                                         ${isComplete ? `
                                             <span class="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                                                 ✓ Complete
@@ -228,7 +207,7 @@ export default function checklistRenderer(config = {}) {
                                     </div>
                                 </div>
                                 <div class="space-y-3">
-                                    ${roomTasks.map(task => this.renderTaskItem(task, room, isDisabled)).join('')}
+                                    ${roomTasks.map(task => this.renderTaskItem(task, room, false)).join('')}
                                 </div>
                             </div>
                         `;
@@ -244,22 +223,7 @@ export default function checklistRenderer(config = {}) {
                 rooms = Object.values(rooms);
             }
 
-            // Calculate which rooms are complete for inventory
-            let firstIncompleteIndex = null;
-            rooms.forEach((room, index) => {
-                // Ensure room.tasks is an array
-                const roomTasksArray = Array.isArray(room.tasks) ? room.tasks : Object.values(room.tasks || {});
-                const inventoryTasks = roomTasksArray.filter(t => room.inventory_tasks.includes(t.id));
-                if (inventoryTasks.length === 0) return;
-
-                const checkedCount = inventoryTasks.filter(t => t.checklist_item?.checked).length;
-                const totalCount = inventoryTasks.length;
-
-                if (firstIncompleteIndex === null && checkedCount < totalCount && totalCount > 0) {
-                    firstIncompleteIndex = index;
-                }
-            });
-
+            // All inventory rooms are now accessible - housekeepers can skip around freely
             return `
                 <div class="space-y-6">
                     ${rooms.map((room, index) => {
@@ -272,19 +236,13 @@ export default function checklistRenderer(config = {}) {
                         const checkedCount = inventoryTasks.filter(t => t.checklist_item?.checked).length;
                         const totalCount = inventoryTasks.length;
                         const isComplete = checkedCount === totalCount && totalCount > 0;
-                        const isDisabled = firstIncompleteIndex !== null && index > firstIncompleteIndex;
 
                         return `
-                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6 ${isDisabled ? 'opacity-60' : ''}"
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6"
                                  data-room-id="${room.id}">
                                 <div class="mb-6">
                                     <div class="flex items-center justify-between mb-3">
                                         <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100">${room.name} — Inventory</h3>
-                                        ${isDisabled ? `
-                                            <span class="text-xs px-2 py-1 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-                                                Complete previous rooms first
-                                            </span>
-                                        ` : ''}
                                         ${isComplete ? `
                                             <span class="text-xs px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                                                 ✓ Complete
@@ -301,7 +259,7 @@ export default function checklistRenderer(config = {}) {
                                     </div>
                                 </div>
                                 <div class="space-y-3">
-                                    ${inventoryTasks.map(task => this.renderTaskItem(task, room, isDisabled)).join('')}
+                                    ${inventoryTasks.map(task => this.renderTaskItem(task, room, false)).join('')}
                                 </div>
                             </div>
                         `;
@@ -693,7 +651,7 @@ export default function checklistRenderer(config = {}) {
         checkRoomCompletion() {
             if (!this.sessionData) return;
 
-            // Re-calculate completion status
+            // Re-calculate completion status and refresh UI when room completes
             let rooms = this.sessionData.rooms || [];
             if (!Array.isArray(rooms)) {
                 rooms = Object.values(rooms);
@@ -706,7 +664,7 @@ export default function checklistRenderer(config = {}) {
                 const totalCount = roomTasks.length;
                 const isComplete = checkedCount === totalCount && totalCount > 0;
 
-                // If room just completed, refresh to unlock next room
+                // If room just completed, refresh to update completion badges
                 if (isComplete) {
                     // Small delay to ensure database is updated
                     setTimeout(() => {
