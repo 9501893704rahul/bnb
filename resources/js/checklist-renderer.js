@@ -484,6 +484,9 @@ export default function checklistRenderer(config = {}) {
             const noteUrl = isPropertyTask
                 ? `/sessions/${this.sessionId}/property-tasks/${task.id}/note`
                 : `/sessions/${this.sessionId}/rooms/${room.id}/tasks/${task.id}/note`;
+            const photoUrl = isPropertyTask
+                ? `/sessions/${this.sessionId}/property-tasks/${task.id}/photo`
+                : `/sessions/${this.sessionId}/rooms/${room.id}/tasks/${task.id}/photo`;
 
             const checked = task.checklist_item?.checked || false;
             const hasInstructions = task.instructions && task.instructions.trim().length > 0;
@@ -491,16 +494,24 @@ export default function checklistRenderer(config = {}) {
             const showDetails = hasInstructions || hasMedia;
             const isViewOnly = this.sessionData.is_view_only || false;
             const taskDisabled = disabled || isViewOnly;
+            const existingNote = task.checklist_item?.note || '';
 
             return `
                 <div data-task-item data-task-id="${task.id}"
                      class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 ${checked ? 'opacity-90' : ''}"
                      x-data="{
-                         detailsOpen: ${!checked && showDetails ? 'true' : 'false'},
+                         detailsOpen: false,
                          galleryOpen: false,
                          gallerySrc: null,
-                         noteValue: '${(task.checklist_item?.note || '').replace(/'/g, "\\'")}',
-                         noteSaving: false
+                         noteModalOpen: false,
+                         photoModalOpen: false,
+                         noteValue: '${existingNote.replace(/'/g, "\\'")}',
+                         noteSaving: false,
+                         photoNote: '',
+                         photoFile: null,
+                         photoPreview: null,
+                         photoUploading: false,
+                         photoError: ''
                      }">
                     <div class="p-4">
                         <div class="flex items-start gap-4">
@@ -521,90 +532,99 @@ export default function checklistRenderer(config = {}) {
                             </div>
 
                             <div class="flex-1 min-w-0">
-                                <div class="flex flex-col gap-3">
-                                    <div class="flex-1 min-w-0">
-                                        <h3 data-task-name class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1 transition-all ${checked ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
-                                            ${task.name}
-                                        </h3>
-
-                                        ${showDetails ? `
-                                            <div class="flex items-center gap-2 mt-1">
-                                                <button type="button" @click="detailsOpen = !detailsOpen"
-                                                        class="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors font-medium">
-                                                    <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': detailsOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                                    </svg>
-                                                    <span x-text="detailsOpen ? 'Hide Instructions' : 'View Instructions'"></span>
-                                                </button>
-                                                ${hasMedia ? `
-                                                    <span class="text-xs text-gray-500 dark:text-gray-400">
-                                                        • ${task.media.length} ${task.media.length === 1 ? 'media' : 'media'}
-                                                    </span>
-                                                ` : ''}
-                                            </div>
-                                        ` : ''}
-
-                                        ${hasInstructions && !checked ? `
-                                            <p class="text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
-                                                ${this.escapeHtml(task.instructions).substring(0, 120)}${task.instructions.length > 120 ? '...' : ''}
-                                            </p>
-                                        ` : ''}
-                                    </div>
-
-                                    <div class="w-full">
-                                        <div data-note-container class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                                            <input type="text"
-                                                   data-note-input
-                                                   x-model="noteValue"
-                                                   placeholder="Add note..."
-                                                   ${taskDisabled ? 'readonly' : ''}
-                                                   @keydown.enter.prevent="
-                                                       const btn = $el.parentElement.querySelector('[data-checklist-note-save]');
-                                                       if (btn && !btn.disabled) btn.click();
-                                                   "
-                                                   class="flex-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${taskDisabled ? 'opacity-50 cursor-not-allowed' : ''}" />
-                                            <button type="button"
-                                                    data-checklist-note-save="true"
-                                                    data-note-url="${noteUrl || ''}"
-                                                    data-note-saving="false"
+                                <div class="flex flex-col gap-2">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <div class="flex-1 min-w-0">
+                                            <h3 data-task-name class="text-base font-semibold text-gray-900 dark:text-gray-100 transition-all ${checked ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
+                                                ${task.name}
+                                            </h3>
+                                        </div>
+                                        
+                                        <!-- Action Icons: Notes and Photo -->
+                                        <div class="flex items-center gap-2 flex-shrink-0">
+                                            <!-- Notes Icon -->
+                                            <button type="button" 
+                                                    @click="noteModalOpen = true"
                                                     ${taskDisabled ? 'disabled' : ''}
-                                                    class="w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
-                                                Save Note
+                                                    class="p-2 rounded-lg transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} ${existingNote ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}"
+                                                    title="${existingNote ? 'Edit note' : 'Add note'}">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                </svg>
+                                            </button>
+                                            
+                                            <!-- Photo Upload Icon -->
+                                            <button type="button" 
+                                                    @click="photoModalOpen = true"
+                                                    ${taskDisabled ? 'disabled' : ''}
+                                                    class="p-2 rounded-lg transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} text-gray-400 dark:text-gray-500"
+                                                    title="Upload photo">
+                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                </svg>
                                             </button>
                                         </div>
                                     </div>
+
+                                    ${showDetails ? `
+                                        <div class="flex items-center gap-2">
+                                            <button type="button" @click="detailsOpen = !detailsOpen"
+                                                    class="inline-flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors font-semibold uppercase tracking-wide">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                                </svg>
+                                                <span x-text="detailsOpen ? 'HIDE NOTES' : 'READ IMPORTANT NOTES'"></span>
+                                                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': detailsOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    ` : ''}
+
+                                    <!-- Existing note indicator -->
+                                    ${existingNote ? `
+                                        <div class="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"></path>
+                                            </svg>
+                                            Note added
+                                        </div>
+                                    ` : ''}
                                 </div>
 
                                 ${showDetails ? `
                                     <div x-show="detailsOpen" x-collapse x-cloak class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                         ${hasInstructions ? `
-                                            <div class="mb-4">
-                                                <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Instructions:</h4>
-                                                <div class="prose dark:prose-invert prose-sm max-w-none bg-gray-50 dark:bg-gray-900/40 rounded-lg p-4">
+                                            <div class="${hasMedia ? 'mb-4' : ''}">
+                                                <div class="prose dark:prose-invert prose-sm max-w-none bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
                                                     ${this.formatInstructions(task.instructions)}
                                                 </div>
                                             </div>
                                         ` : ''}
 
                                         ${hasMedia ? `
-                                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                                ${task.media.map(media => `
-                                                    <div class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
-                                                        ${media.type === 'image' ? `
-                                                            <button type="button" @click="galleryOpen = true; gallerySrc = '${media.url}'" class="block w-full">
-                                                                <img src="${media.thumbnail || media.url}" alt="${media.caption || 'Task media'}"
-                                                                     class="w-full h-32 object-cover transition-transform group-hover:scale-105" loading="lazy" />
-                                                            </button>
-                                                        ` : `
-                                                            <video src="${media.url}" class="w-full h-32 object-cover" controls muted></video>
-                                                        `}
-                                                        ${media.caption ? `
-                                                            <span class="absolute bottom-1 left-1 text-xs px-2 py-1 rounded bg-black/60 text-white">
-                                                                ${this.escapeHtml(media.caption.substring(0, 20))}
-                                                            </span>
-                                                        ` : ''}
-                                                    </div>
-                                                `).join('')}
+                                            <div class="mt-3">
+                                                <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Reference Media:</h4>
+                                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                                    ${task.media.map(media => `
+                                                        <div class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
+                                                            ${media.type === 'image' ? `
+                                                                <button type="button" @click="galleryOpen = true; gallerySrc = '${media.url}'" class="block w-full">
+                                                                    <img src="${media.thumbnail || media.url}" alt="${media.caption || 'Task media'}"
+                                                                         class="w-full h-32 object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                                                                </button>
+                                                            ` : `
+                                                                <video src="${media.url}" class="w-full h-32 object-cover" controls muted></video>
+                                                            `}
+                                                            ${media.caption ? `
+                                                                <span class="absolute bottom-1 left-1 text-xs px-2 py-1 rounded bg-black/60 text-white">
+                                                                    ${this.escapeHtml(media.caption.substring(0, 20))}
+                                                                </span>
+                                                            ` : ''}
+                                                        </div>
+                                                    `).join('')}
+                                                </div>
                                             </div>
                                         ` : ''}
                                     </div>
@@ -613,6 +633,173 @@ export default function checklistRenderer(config = {}) {
                         </div>
                     </div>
 
+                    <!-- Note Modal -->
+                    <div x-show="noteModalOpen" x-cloak 
+                         @keydown.escape.window="noteModalOpen = false"
+                         class="fixed inset-0 z-50 overflow-y-auto">
+                        <div class="flex min-h-full items-center justify-center p-4">
+                            <div x-show="noteModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                 @click="noteModalOpen = false" class="fixed inset-0 bg-black/50"></div>
+                            <div x-show="noteModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                                 class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Add Note</h3>
+                                <textarea x-model="noteValue" 
+                                          placeholder="Enter your note here..."
+                                          rows="4"
+                                          class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+                                <div class="flex justify-end gap-3 mt-4">
+                                    <button type="button" @click="noteModalOpen = false"
+                                            class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="button"
+                                            data-checklist-note-save="true"
+                                            data-note-url="${noteUrl}"
+                                            @click="$el.dataset.noteSaving = 'true'; setTimeout(() => noteModalOpen = false, 500)"
+                                            :disabled="noteSaving"
+                                            class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                        <span x-show="!noteSaving">Save Note</span>
+                                        <span x-show="noteSaving">Saving...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload Modal -->
+                    <div x-show="photoModalOpen" x-cloak 
+                         @keydown.escape.window="photoModalOpen = false"
+                         class="fixed inset-0 z-50 overflow-y-auto">
+                        <div class="flex min-h-full items-center justify-center p-4">
+                            <div x-show="photoModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+                                 @click="photoModalOpen = false" class="fixed inset-0 bg-black/50"></div>
+                            <div x-show="photoModalOpen" x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+                                 class="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full p-6">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Upload Photo</h3>
+                                
+                                <!-- Photo Preview -->
+                                <div x-show="photoPreview" class="mb-4">
+                                    <img :src="photoPreview" class="w-full h-48 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                                </div>
+                                
+                                <!-- File Input -->
+                                <div x-show="!photoPreview" class="mb-4">
+                                    <label class="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
+                                        <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                            <svg class="w-8 h-8 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                            </svg>
+                                            <p class="text-sm text-gray-500 dark:text-gray-400">Tap to select photo</p>
+                                        </div>
+                                        <input type="file" accept="image/*" capture="environment" class="hidden"
+                                               @change="
+                                                   const file = $event.target.files[0];
+                                                   if (file) {
+                                                       photoFile = file;
+                                                       const reader = new FileReader();
+                                                       reader.onload = (e) => photoPreview = e.target.result;
+                                                       reader.readAsDataURL(file);
+                                                   }
+                                               " />
+                                    </label>
+                                </div>
+                                
+                                <!-- Change Photo Button -->
+                                <div x-show="photoPreview" class="mb-4">
+                                    <label class="text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+                                        Change photo
+                                        <input type="file" accept="image/*" capture="environment" class="hidden"
+                                               @change="
+                                                   const file = $event.target.files[0];
+                                                   if (file) {
+                                                       photoFile = file;
+                                                       const reader = new FileReader();
+                                                       reader.onload = (e) => photoPreview = e.target.result;
+                                                       reader.readAsDataURL(file);
+                                                   }
+                                               " />
+                                    </label>
+                                </div>
+                                
+                                <!-- Note Input (Required) -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Note <span class="text-red-500">*</span>
+                                    </label>
+                                    <textarea x-model="photoNote" 
+                                              placeholder="Describe what's in the photo (required)..."
+                                              rows="3"
+                                              class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"></textarea>
+                                </div>
+                                
+                                <!-- Error Message -->
+                                <div x-show="photoError" x-cloak class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                    <p class="text-sm text-red-600 dark:text-red-400" x-text="photoError"></p>
+                                </div>
+                                
+                                <div class="flex justify-end gap-3">
+                                    <button type="button" @click="photoModalOpen = false; photoPreview = null; photoFile = null; photoNote = ''; photoError = '';"
+                                            class="px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="button"
+                                            @click="
+                                                if (!photoFile) {
+                                                    photoError = 'Please select a photo';
+                                                    return;
+                                                }
+                                                if (!photoNote.trim()) {
+                                                    photoError = 'Please add a note describing the photo';
+                                                    return;
+                                                }
+                                                photoError = '';
+                                                photoUploading = true;
+                                                
+                                                const formData = new FormData();
+                                                formData.append('photo', photoFile);
+                                                formData.append('note', photoNote);
+                                                
+                                                fetch('${photoUrl}', {
+                                                    method: 'POST',
+                                                    headers: {
+                                                        'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                                                        'Accept': 'application/json'
+                                                    },
+                                                    body: formData
+                                                })
+                                                .then(response => response.json())
+                                                .then(data => {
+                                                    if (data.success) {
+                                                        photoModalOpen = false;
+                                                        photoPreview = null;
+                                                        photoFile = null;
+                                                        photoNote = '';
+                                                        // Show success message
+                                                        if (window.checklistRenderer) {
+                                                            window.checklistRenderer.refresh();
+                                                        }
+                                                    } else {
+                                                        photoError = data.message || 'Failed to upload photo';
+                                                    }
+                                                })
+                                                .catch(err => {
+                                                    photoError = 'Failed to upload photo. Please try again.';
+                                                })
+                                                .finally(() => {
+                                                    photoUploading = false;
+                                                });
+                                            "
+                                            :disabled="photoUploading"
+                                            class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50">
+                                        <span x-show="!photoUploading">Upload Photo</span>
+                                        <span x-show="photoUploading">Uploading...</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gallery Modal -->
                     <div x-show="galleryOpen" x-cloak @click.self="galleryOpen = false" @keydown.escape.window="galleryOpen = false"
                          class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
                         <img :src="gallerySrc" class="max-h-[90vh] max-w-[90vw] rounded-lg shadow-2xl" alt="Gallery view" />
