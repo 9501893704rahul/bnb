@@ -4,7 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $siteName ?? config('app.name', 'HK Checklist') }}</title>
+    <title>{{ $siteName ?? config('app.name', 'HK Checklist') }} - Professional Housekeeping Management</title>
+    <meta name="description" content="Streamline your vacation rental cleaning operations with automated checklists, photo documentation, and calendar sync with Airbnb, VRBO, and Booking.com">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <!-- Primary theme color -->
@@ -198,47 +199,188 @@
         </div>
     </section>
 
-    <!-- Features -->
-    <section class="py-14">
+    <!-- Trust Badges -->
+    <section class="py-10 border-b border-gray-200 dark:border-gray-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <h3 class="text-lg font-semibold mb-6">Why teams use {{ $siteName ?? config('app.name', 'HK Checklist') }}</h3>
+            <div class="text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Integrates with your favorite platforms</p>
+                <div class="flex flex-wrap justify-center items-center gap-8 opacity-60">
+                    <span class="text-xl font-bold text-red-500">Airbnb</span>
+                    <span class="text-xl font-bold text-blue-600">VRBO</span>
+                    <span class="text-xl font-bold text-indigo-600">Booking.com</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features -->
+    <section class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                    Everything You Need to Manage Vacation Rental Cleaning
+                </h2>
+                <p class="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                    From scheduling to photo documentation, our platform handles every aspect of housekeeping management.
+                </p>
+            </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 @php
                     $features = [
                         [
-                            'title' => 'Assign & track',
-                            'desc' => 'Owners assign housekeepers by property and date, see status live.',
+                            'icon' => '📋',
+                            'title' => 'Smart Task Checklists',
+                            'desc' => 'Create detailed room-by-room checklists with example photos and videos showing exactly how each task should be done.',
                         ],
                         [
-                            'title' => 'GPS start gate',
-                            'desc' => 'Start requires on-site confirmation within property radius.',
-                        ],
-                        ['title' => 'Room checklists', 'desc' => 'Clear tasks, notes, and completion marks per room.'],
-                        [
-                            'title' => 'Inventory checks',
-                            'desc' => 'Separate inventory step ensures essentials are replenished.',
+                            'icon' => '📍',
+                            'title' => 'GPS Verification',
+                            'desc' => 'Ensure housekeepers are on-site before starting. GPS confirms location within your property radius.',
                         ],
                         [
-                            'title' => 'Photo evidence',
-                            'desc' => '8+ photos per room with timestamp overlay for accountability.',
+                            'icon' => '📷',
+                            'title' => 'Timestamped Photos',
+                            'desc' => 'Every photo is automatically timestamped in the corner. Download high-res originals or view web-optimized versions.',
                         ],
                         [
-                            'title' => 'Calendar view',
-                            'desc' => 'Monthly schedule for HKs, owner-scoped, or system-wide for admin.',
+                            'icon' => '📅',
+                            'title' => 'Calendar Sync',
+                            'desc' => 'Connect Airbnb, VRBO, and Booking.com calendars. Get automatic checkout alerts to schedule cleanings.',
+                        ],
+                        [
+                            'icon' => '📊',
+                            'title' => 'Detailed Reports',
+                            'desc' => 'Generate beautiful reports with all tasks, notes, and photos. Share via email or text with a single click.',
+                        ],
+                        [
+                            'icon' => '👥',
+                            'title' => 'Multi-User Support',
+                            'desc' => 'Perfect for property managers and cleaning companies. Add owners, manage housekeepers, keep everything organized.',
                         ],
                     ];
                 @endphp
 
                 @foreach ($features as $f)
-                    <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-                        <div
-                            class="mb-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-theme-primary"
-                            style="background-color: color-mix(in srgb, var(--theme-primary) 12%, transparent);">
-                            ★</div>
-                        <div class="font-medium">{{ $f['title'] }}</div>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ $f['desc'] }}</p>
+                    <div class="rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-6 hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">{{ $f['icon'] }}</div>
+                        <div class="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-2">{{ $f['title'] }}</div>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">{{ $f['desc'] }}</p>
                     </div>
                 @endforeach
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem/Solution Section -->
+    <section class="py-16 bg-gradient-to-br from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid lg:grid-cols-2 gap-12 items-center">
+                <div>
+                    <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6">
+                        Stop Chasing Housekeepers for Updates
+                    </h2>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <span class="text-red-600 dark:text-red-400 text-sm">✕</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Endless text messages asking "Are you done yet?"</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <span class="text-red-600 dark:text-red-400 text-sm">✕</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">No proof that work was actually completed properly</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <span class="text-red-600 dark:text-red-400 text-sm">✕</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Forgetting to schedule cleanings after guest checkouts</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                                <span class="text-red-600 dark:text-red-400 text-sm">✕</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Bad reviews because tasks were missed</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 shadow-xl">
+                    <h3 class="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-4">With {{ $siteName ?? config('app.name', 'HK Checklist') }}:</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <span class="text-green-600 dark:text-green-400 text-sm">✓</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Real-time status updates as tasks are completed</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <span class="text-green-600 dark:text-green-400 text-sm">✓</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Timestamped photos prove work quality</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <span class="text-green-600 dark:text-green-400 text-sm">✓</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Automatic checkout alerts from your booking calendars</p>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="flex-shrink-0 w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                                <span class="text-green-600 dark:text-green-400 text-sm">✓</span>
+                            </div>
+                            <p class="text-gray-600 dark:text-gray-300">Consistent quality with detailed checklists</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- For Property Managers Section -->
+    <section class="py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 mb-4">
+                    For Property Management Companies
+                </span>
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-4">
+                    Scale Your Cleaning Operations
+                </h2>
+                <p class="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                    Manage multiple property owners, their properties, and your cleaning team all in one place.
+                </p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                        <span class="text-2xl">🏢</span>
+                    </div>
+                    <h3 class="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-2">Company Dashboard</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                        Add property owners under your company. They see only their properties while you see everything.
+                    </p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                        <span class="text-2xl">👥</span>
+                    </div>
+                    <h3 class="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-2">Team Management</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                        Your housekeepers stay under your company. Owners can't see your other clients' staff.
+                    </p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                        <span class="text-2xl">📨</span>
+                    </div>
+                    <h3 class="font-semibold text-lg text-gray-900 dark:text-gray-100 mb-2">Owner Reports</h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                        Send professional cleaning reports to owners via email or text. Build trust with transparency.
+                    </p>
+                </div>
             </div>
         </div>
     </section>

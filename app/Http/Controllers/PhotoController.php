@@ -13,11 +13,14 @@ class PhotoController extends Controller
     public function store(Request $request, CleaningSession $session, $roomId)
     {
         $request->validate([
-            'photos.*' => ['required', 'image', 'max:5120'], // 5MB per image
+            'photos.*' => ['required', 'image', 'max:10240'], // 10MB per image for high-res
+            'photo_type' => ['nullable', 'in:completion,problem'],
         ]);
 
-        $room   = $session->property->rooms()->findOrFail($roomId);
-        $saved  = [];
+        $room = $session->property->rooms()->findOrFail($roomId);
+        $saved = [];
+        $photoType = $request->input('photo_type', 'completion');
+        $capturedAt = now();
         
         // Get files from request - ensure we only process unique files
         $files = $request->file('photos', []);
@@ -25,61 +28,95 @@ class PhotoController extends Controller
         // Remove duplicates by comparing file content hash
         $processedHashes = [];
         foreach ($files as $file) {
-            // Create a hash of the file content to detect duplicates
             $fileHash = md5_file($file->getRealPath());
             
-            // Skip if we've already processed this file
             if (in_array($fileHash, $processedHashes)) {
                 continue;
             }
             
             $processedHashes[] = $fileHash;
             
-            $filename = $file->store('room_photos', 'public');
-            $photo    = $session->photos()->create([
-                'room_id'     => $room->id,
-                'path'        => $filename,
-                'captured_at' => now(),
-                // optionally set has_timestamp_overlay = true if your service overlays it
+            // Store original high-res image
+            $highResPath = $file->store('room_photos/high_res', 'public');
+            
+            // Store a copy for processing
+            $webPath = $file->store('room_photos', 'public');
+            
+            // Generate thumbnail with timestamp overlay
+            $thumbnailPath = ImageTimestampService::overlayAndSave($webPath, $capturedAt);
+            
+            $photo = $session->photos()->create([
+                'room_id' => $room->id,
+                'path' => $webPath,
+                'high_res_path' => $highResPath,
+                'thumbnail_path' => $thumbnailPath,
+                'photo_type' => $photoType,
+                'captured_at' => $capturedAt,
+                'has_timestamp_overlay' => $thumbnailPath !== null,
             ]);
+            
             $saved[] = [
-                'id'          => $photo->id,
-                'url'         => asset('storage/' . $filename),
+                'id' => $photo->id,
+                'url' => $photo->url,
+                'high_res_url' => $photo->high_res_url,
                 'captured_at' => $photo->captured_at->format('H:i'),
+                'photo_type' => $photo->photo_type,
             ];
         }
 
-        // For AJAX calls, return JSON. The front end can add these to the gallery without reloading.
         if ($request->expectsJson() || $request->wantsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
                 'message' => count($saved) . ' photos uploaded.',
-                'photos'  => $saved,
+                'photos' => $saved,
             ]);
         }
 
-        // Fallback to standard redirect if not an AJAX request
         return back()->with('ok', count($saved) . ' photos uploaded.');
     }
 
     public function destroy(CleaningSession $session, RoomPhoto $photo)
     {
-        // Verify the photo belongs to this session
         if ($photo->session_id !== $session->id) {
             return response()->json(['success' => false, 'message' => 'Photo not found'], 404);
         }
 
-        // Delete file from storage
-        if (Storage::disk('public')->exists($photo->path)) {
-            Storage::disk('public')->delete($photo->path);
+        // Delete all associated files
+        $pathsToDelete = array_filter([
+            $photo->path,
+            $photo->high_res_path,
+            $photo->thumbnail_path,
+        ]);
+
+        foreach ($pathsToDelete as $path) {
+            if (Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->delete($path);
+            }
         }
 
-        // Delete from database
         $photo->delete();
 
         return response()->json([
             'success' => true,
             'message' => 'Photo deleted successfully',
         ]);
+    }
+
+    /**
+     * Download high-resolution photo
+     */
+    public function download(CleaningSession $session, RoomPhoto $photo)
+    {
+        if ($photo->session_id !== $session->id) {
+            abort(404);
+        }
+
+        $path = $photo->high_res_path ?: $photo->path;
+        
+        if (!Storage::disk('public')->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk('public')->download($path, 'photo_' . $photo->id . '_highres.' . pathinfo($path, PATHINFO_EXTENSION));
     }
 }

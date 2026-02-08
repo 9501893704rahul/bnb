@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\CalendarIntegrationController;
 use App\Http\Controllers\ChecklistController;
+use App\Http\Controllers\CleaningReportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ManageSessionController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +22,7 @@ use App\Http\Controllers\RoomTaskAttachController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskMediaController;
 use App\Http\Controllers\TaskSuggestionController;
+use App\Http\Controllers\PhotoController;
 
 /*
 |--------------------------------------------------------------------------
@@ -111,8 +114,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('/tasks/{task}/media/{media}',     [TaskMediaController::class, 'destroy'])->name('tasks.media.destroy');
     });
 
-    // Users management (admin and owner only, housekeepers cannot access)
-    Route::middleware('role:admin|owner')->group(function () {
+    // Users management (admin, owner, and company can access)
+    Route::middleware('role:admin|owner|company')->group(function () {
         Route::get('users', [\App\Http\Controllers\UserController::class, 'index'])->name('users.index');
         Route::post('users/{user}/assign-role', [\App\Http\Controllers\UserController::class, 'assignRole'])->name('users.assignRole');
         Route::get('users/create', [\App\Http\Controllers\UserController::class, 'create'])->name('users.create');
@@ -156,13 +159,24 @@ Route::middleware('auth')->group(function () {
     Route::post('/sessions/{session}/property-tasks/{task}/photo', [ChecklistController::class, 'propertyTaskPhoto'])
         ->name('checklist.property-task.photo');
 
-    Route::post('/sessions/{session}/rooms/{room}/photos', [\App\Http\Controllers\PhotoController::class, 'store'])->name('photos.store');
-    Route::delete('/api/sessions/{session}/photos/{photo}', [\App\Http\Controllers\PhotoController::class, 'destroy'])->name('photos.destroy');
+    Route::post('/sessions/{session}/rooms/{room}/photos', [PhotoController::class, 'store'])->name('photos.store');
+    Route::delete('/api/sessions/{session}/photos/{photo}', [PhotoController::class, 'destroy'])->name('photos.destroy');
+    Route::get('/sessions/{session}/photos/{photo}/download', [PhotoController::class, 'download'])->name('photos.download');
 
     Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+    
+    // Cleaning Reports
+    Route::post('/sessions/{session}/report/generate', [CleaningReportController::class, 'generate'])->name('reports.generate');
+    Route::get('/sessions/{session}/report', [CleaningReportController::class, 'show'])->name('reports.show');
+    Route::post('/sessions/{session}/report/email', [CleaningReportController::class, 'sendEmail'])->name('reports.send-email');
+    Route::post('/sessions/{session}/report/sms', [CleaningReportController::class, 'sendSms'])->name('reports.send-sms');
+    Route::get('/sessions/{session}/report/download-photos', [CleaningReportController::class, 'downloadPhotos'])->name('reports.download-photos');
+
+    // Upcoming checkouts from calendar integrations
+    Route::get('/checkouts', [CalendarIntegrationController::class, 'checkouts'])->name('checkouts.index');
 });
 
-Route::middleware(['auth', 'role:owner|admin'])
+Route::middleware(['auth', 'role:owner|admin|company'])
     ->prefix('manage')->name('manage.')
     ->group(function () {
         Route::get('sessions',        [ManageSessionController::class, 'index'])->name('sessions.index');
@@ -172,6 +186,23 @@ Route::middleware(['auth', 'role:owner|admin'])
         Route::put('sessions/{session}',      [ManageSessionController::class, 'update'])->name('sessions.update');
         Route::delete('sessions/{session}',   [ManageSessionController::class, 'destroy'])->name('sessions.destroy');
     });
+
+// Calendar Integrations (for property owners and companies)
+Route::middleware(['auth', 'role:owner|admin|company'])
+    ->prefix('properties/{property}/calendar-integrations')
+    ->name('properties.calendar-integrations.')
+    ->group(function () {
+        Route::get('/', [CalendarIntegrationController::class, 'index'])->name('index');
+        Route::get('/create', [CalendarIntegrationController::class, 'create'])->name('create');
+        Route::post('/', [CalendarIntegrationController::class, 'store'])->name('store');
+        Route::get('/{integration}/edit', [CalendarIntegrationController::class, 'edit'])->name('edit');
+        Route::put('/{integration}', [CalendarIntegrationController::class, 'update'])->name('update');
+        Route::delete('/{integration}', [CalendarIntegrationController::class, 'destroy'])->name('destroy');
+        Route::post('/{integration}/sync', [CalendarIntegrationController::class, 'sync'])->name('sync');
+    });
+
+// Public report view (no auth required)
+Route::get('/r/{token}', [CleaningReportController::class, 'viewByToken'])->name('reports.view');
 
 
 Route::middleware(['auth'])->group(function () {
