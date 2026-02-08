@@ -14,6 +14,7 @@ class Property extends Model
 
     protected $fillable = [
         'owner_id',
+        'company_id',
         'name',
         'address',
         'photo_path',
@@ -37,6 +38,11 @@ class Property extends Model
         return $this->belongsTo(\App\Models\User::class, 'owner_id', 'id');
     }
 
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'company_id', 'id');
+    }
+
     public function propertyTasks(): BelongsToMany
     {
         return $this->belongsToMany(Task::class, 'property_tasks')
@@ -45,10 +51,37 @@ class Property extends Model
             ->orderBy('property_tasks.sort_order');
     }
 
+    public function calendarIntegrations(): HasMany
+    {
+        return $this->hasMany(CalendarIntegration::class);
+    }
+
+    public function calendarEvents(): HasMany
+    {
+        return $this->hasMany(CalendarEvent::class);
+    }
+
+    public function cleaningSessions(): HasMany
+    {
+        return $this->hasMany(CleaningSession::class);
+    }
+
     public function getPhotoUrlAttribute(): string
     {
         return $this->photo_path
             ? (str_starts_with($this->photo_path, 'http') ? $this->photo_path : asset('storage/' . $this->photo_path))
             : asset('images/placeholders/property.png');
+    }
+
+    /**
+     * Get upcoming checkouts from calendar integrations
+     */
+    public function getUpcomingCheckouts(int $days = 7)
+    {
+        return $this->calendarEvents()
+            ->where('end_date', '>=', now()->toDateString())
+            ->where('end_date', '<=', now()->addDays($days)->toDateString())
+            ->orderBy('end_date')
+            ->get();
     }
 }

@@ -17,7 +17,7 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $this->assertOwnerOrAdmin();
+        $this->assertOwnerOrAdminOrCompany();
 
         $auth = $request->user();
         $role = (string) $request->query('role', '');
@@ -25,16 +25,30 @@ class UserController extends Controller
 
         $users = User::query()
             ->with('roles')
-            ->when($auth->hasRole('owner') && ! $auth->hasRole('admin'), function ($qry) use ($auth) {
+            // Company users see only their members
+            ->when($auth->hasRole('company') && ! $auth->hasRole('admin'), function ($qry) use ($auth) {
+                $qry->where(function ($q) use ($auth) {
+                    $q->where('users.id', $auth->id)
+                        ->orWhere('users.company_id', $auth->id);
+                });
+            })
+            // Owner users see themselves and their assigned housekeepers
+            ->when($auth->hasRole('owner') && ! $auth->hasRole('admin') && ! $auth->hasRole('company'), function ($qry) use ($auth) {
                 $qry->where(function ($q) use ($auth) {
                     $q->where('users.id', $auth->id)
                         ->orWhere(function ($qq) use ($auth) {
                             $qq->whereHas('roles', fn($r) => $r->where('name', 'housekeeper'))
-                                ->whereExists(function ($sub) use ($auth) {
-                                    $sub->selectRaw(1)
-                                        ->from('cleaning_sessions as cs')
-                                        ->whereColumn('cs.housekeeper_id', 'users.id')
-                                        ->where('cs.owner_id', $auth->id);
+                                ->where(function ($sub) use ($auth) {
+                                    // Either assigned via session or same company
+                                    $sub->whereExists(function ($exists) use ($auth) {
+                                        $exists->selectRaw(1)
+                                            ->from('cleaning_sessions as cs')
+                                            ->whereColumn('cs.housekeeper_id', 'users.id')
+                                            ->where('cs.owner_id', $auth->id);
+                                    });
+                                    if ($auth->company_id) {
+                                        $sub->orWhere('users.company_id', $auth->company_id);
+                                    }
                                 });
                         });
                 });
@@ -53,23 +67,32 @@ class UserController extends Controller
 
     public function assignRole(Request $request, User $user)
     {
-        $this->assertOwnerOrAdmin();
+        $this->assertOwnerOrAdminOrCompany();
 
         $auth = $request->user();
 
         $data = $request->validate([
-            'role' => ['required', Rule::in(['admin', 'owner', 'housekeeper'])],
+            'role' => ['required', Rule::in(['admin', 'owner', 'housekeeper', 'company'])],
         ]);
 
         // Admin can assign anything.
-        if ($auth->hasRole('owner') && ! $auth->hasRole('admin')) {
+        if ($auth->hasRole('company') && ! $auth->hasRole('admin')) {
+            // Company can assign owner or housekeeper roles to their members
+            if (!in_array($data['role'], ['owner', 'housekeeper'])) {
+                abort(403, 'Companies can only assign owner or housekeeper roles.');
+            }
+            // Can only modify users under their company
+            if ($user->company_id !== $auth->id && $user->id !== $auth->id) {
+                abort(403, 'Not a member of your company.');
+            }
+        } elseif ($auth->hasRole('owner') && ! $auth->hasRole('admin') && ! $auth->hasRole('company')) {
             // Owners may ONLY assign housekeeper role.
             if ($data['role'] !== 'housekeeper') {
                 abort(403, 'Owners can only assign the housekeeper role.');
             }
             // Owners cannot modify privileged users.
-            if ($user->hasAnyRole(['admin', 'owner'])) {
-                abort(403, 'Cannot modify admin/owner users.');
+            if ($user->hasAnyRole(['admin', 'owner', 'company'])) {
+                abort(403, 'Cannot modify admin/owner/company users.');
             }
             // If you want to restrict to their own HKs only, enforce exists() below:
             $isAssignedToOwner = DB::table('cleaning_sessions')
@@ -90,9 +113,9 @@ class UserController extends Controller
      */
     public function create()
     {
-        // Admin and owner can create users
+        // Admin, owner, and company can create users
         $user = auth()->user();
-        abort_unless($user && ($user->hasRole('admin') || $user->hasRole('owner')), 403, 'You do not have permission to create users.');
+        abort_unless($user && ($user->hasRole('admin') || $user->hasRole('owner') || $user->hasRole('company')), 403, 'You do not have permission to create users.');
 
         return view('users.create');
     }
@@ -105,10 +128,22 @@ class UserController extends Controller
         $data = $request->validated();
         $authUser = $request->user();
 
-        // Enforce: Owners can only create housekeepers
-        if ($authUser->hasRole('owner') && !$authUser->hasRole('admin')) {
+        // Enforce role restrictions
+        if ($authUser->hasRole('company') && !$authUser->hasRole('admin')) {
+            // Companies can create owners or housekeepers under them
+            if (!in_array($data['role'], ['owner', 'housekeeper'])) {
+                abort(403, 'Companies can only create owner or housekeeper users.');
+            }
+            // Set company_id for the new user
+            $data['company_id'] = $authUser->id;
+        } elseif ($authUser->hasRole('owner') && !$authUser->hasRole('admin') && !$authUser->hasRole('company')) {
+            // Owners can only create housekeepers
             if ($data['role'] !== 'housekeeper') {
                 abort(403, 'Owners can only create housekeeper users.');
+            }
+            // Set company_id if owner belongs to a company
+            if ($authUser->company_id) {
+                $data['company_id'] = $authUser->company_id;
             }
         }
 
@@ -124,6 +159,7 @@ class UserController extends Controller
             'password' => $data['password'],
             'phone_number' => $data['phone_number'] ?? null,
             'profile_photo_path' => $data['profile_photo_path'] ?? null,
+            'company_id' => $data['company_id'] ?? null,
         ]);
 
         // Assign role
@@ -259,5 +295,11 @@ class UserController extends Controller
     {
         $u = auth()->user();
         abort_unless($u && $u->hasAnyRole(['admin', 'owner']), 403);
+    }
+
+    private function assertOwnerOrAdminOrCompany(): void
+    {
+        $u = auth()->user();
+        abort_unless($u && $u->hasAnyRole(['admin', 'owner', 'company']), 403);
     }
 }

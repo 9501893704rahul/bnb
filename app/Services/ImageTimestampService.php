@@ -5,41 +5,85 @@ namespace App\Services;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Typography\FontFactory;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class ImageTimestampService
 {
-    public static function overlay(string $absolutePath, \DateTimeInterface $when): void
+    /**
+     * Add timestamp overlay to image at bottom-right corner
+     * Returns path to thumbnail with overlay (original preserved)
+     */
+    public static function overlayAndSave(string $storagePath, \DateTimeInterface $when): ?string
     {
+        $absolutePath = Storage::disk('public')->path($storagePath);
+
         if (!is_file($absolutePath) || !is_readable($absolutePath)) {
-            return; // silently skip if file not found or unreadable
+            return null;
         }
 
         try {
             $manager = new ImageManager(new Driver());
-            $image   = $manager->read($absolutePath);
+            $image = $manager->read($absolutePath);
 
-            // Y coordinate: keep within canvas for small images
-            $y = max(28 + 6, $image->height() - 20); // font size + small padding
+            // Calculate position for bottom-right corner with padding
+            $x = $image->width() - 20;
+            $y = $image->height() - 20;
 
-            $text = 'Captured: ' . $when->format('Y-m-d H:i:s T');
+            $text = $when->format('Y-m-d H:i:s');
 
-            $image->text($text, 20, $y, function (FontFactory $font) {
-                // v3 API — size:int, color:string, align/valign strings, stroke(color,width)
+            $image->text($text, $x, $y, function (FontFactory $font) {
                 $font->size(28);
                 $font->color('#ffffff');
-                $font->align('left');
+                $font->align('right');
                 $font->valign('bottom');
-                $font->stroke('#000000', 1); // <-- fixed order: color first, then width
-
-                // Optional: load a TTF if GD lacks good default font
-                // $font->filename(resource_path('fonts/Inter-Regular.ttf'));
+                $font->stroke('#000000', 2);
             });
 
-            // Save with quality (GD ignores on PNG but safe)
+            // Generate thumbnail path
+            $pathInfo = pathinfo($storagePath);
+            $thumbnailPath = $pathInfo['dirname'] . '/' . $pathInfo['filename'] . '_thumb.' . $pathInfo['extension'];
+            $thumbnailAbsPath = Storage::disk('public')->path($thumbnailPath);
+
+            // Resize for web display (max 1200px width)
+            $image->scale(width: 1200);
+            $image->save($thumbnailAbsPath, 85);
+
+            return $thumbnailPath;
+        } catch (Throwable $e) {
+            report($e);
+            return null;
+        }
+    }
+
+    /**
+     * Legacy method for backward compatibility - overlays in place
+     */
+    public static function overlay(string $absolutePath, \DateTimeInterface $when): void
+    {
+        if (!is_file($absolutePath) || !is_readable($absolutePath)) {
+            return;
+        }
+
+        try {
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($absolutePath);
+
+            $x = $image->width() - 20;
+            $y = $image->height() - 20;
+
+            $text = $when->format('Y-m-d H:i:s');
+
+            $image->text($text, $x, $y, function (FontFactory $font) {
+                $font->size(28);
+                $font->color('#ffffff');
+                $font->align('right');
+                $font->valign('bottom');
+                $font->stroke('#000000', 2);
+            });
+
             $image->save($absolutePath, 85);
         } catch (Throwable $e) {
-            // Avoid breaking uploads; log for later inspection
             report($e);
         }
     }
