@@ -498,7 +498,7 @@ export default function checklistRenderer(config = {}) {
 
             return `
                 <div data-task-item data-task-id="${task.id}"
-                     class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 ${checked ? 'opacity-90' : ''}"
+                     class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-200 overflow-hidden ${checked ? 'bg-green-50/50 dark:bg-green-900/10' : ''}"
                      x-data="{
                          detailsOpen: false,
                          galleryOpen: false,
@@ -513,122 +513,110 @@ export default function checklistRenderer(config = {}) {
                          photoUploading: false,
                          photoError: ''
                      }">
-                    <div class="p-4">
-                        <div class="flex items-start gap-4">
-                            <div class="flex-shrink-0 pt-0.5">
-                                <button type="button"
-                                        data-checklist-toggle
-                                        data-toggle-url="${toggleUrl}"
-                                        data-checked="${checked}"
-                                        ${taskDisabled ? 'disabled' : ''}
-                                        class="relative w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-110'} ${checked ? 'bg-green-600 border-green-600 text-white' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600'}"
-                                        aria-label="${checked ? 'Mark as incomplete' : 'Mark as complete'}">
-                                    ${checked ? `
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
-                                        </svg>
-                                    ` : ''}
+                    <div class="p-3 sm:p-4">
+                        {{-- Main task row: checkbox + task name --}}
+                        <div class="flex items-center gap-3">
+                            <button type="button"
+                                    data-checklist-toggle
+                                    data-toggle-url="${toggleUrl}"
+                                    data-checked="${checked}"
+                                    ${taskDisabled ? 'disabled' : ''}
+                                    class="flex-shrink-0 w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105 active:scale-95'} ${checked ? 'bg-green-600 border-green-600 text-white' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600'}"
+                                    aria-label="${checked ? 'Mark as incomplete' : 'Mark as complete'}">
+                                ${checked ? `
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                ` : ''}
+                            </button>
+
+                            <h3 data-task-name class="flex-1 text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 transition-all leading-tight ${checked ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
+                                ${task.name}
+                            </h3>
+                        </div>
+
+                        {{-- Instructions toggle - compact, single line --}}
+                        ${showDetails ? `
+                            <div class="mt-2 ml-10">
+                                <button type="button" @click="detailsOpen = !detailsOpen"
+                                        class="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors font-medium">
+                                    <span x-text="detailsOpen ? 'Hide instructions' : 'Read instructions'"></span>
+                                    <svg class="w-3 h-3 transition-transform" :class="{ 'rotate-180': detailsOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
                                 </button>
                             </div>
+                        ` : ''}
 
-                            <div class="flex-1 min-w-0">
-                                <div class="flex flex-col gap-2">
-                                    <div class="flex items-start justify-between gap-2">
-                                        <div class="flex-1 min-w-0">
-                                            <h3 data-task-name class="text-base font-semibold text-gray-900 dark:text-gray-100 transition-all ${checked ? 'line-through text-gray-500 dark:text-gray-400' : ''}">
-                                                ${task.name}
-                                            </h3>
+                        {{-- Collapsible instructions content --}}
+                        ${showDetails ? `
+                            <div x-show="detailsOpen" x-collapse x-cloak class="mt-3 ml-10">
+                                ${hasInstructions ? `
+                                    <div class="${hasMedia ? 'mb-3' : ''}">
+                                        <div class="prose dark:prose-invert prose-sm max-w-none bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm">
+                                            ${this.formatInstructions(task.instructions)}
                                         </div>
-                                        
-                                        <!-- Action Icons: Notes and Photo -->
-                                        <div class="flex items-center gap-2 flex-shrink-0">
-                                            <!-- Notes Icon -->
-                                            <button type="button" 
-                                                    @click="noteModalOpen = true"
-                                                    ${taskDisabled ? 'disabled' : ''}
-                                                    class="p-2 rounded-lg transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} ${existingNote ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}"
-                                                    title="${existingNote ? 'Edit note' : 'Add note'}">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                                                </svg>
-                                            </button>
-                                            
-                                            <!-- Photo Upload Icon -->
-                                            <button type="button" 
-                                                    @click="photoModalOpen = true"
-                                                    ${taskDisabled ? 'disabled' : ''}
-                                                    class="p-2 rounded-lg transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} text-gray-400 dark:text-gray-500"
-                                                    title="Upload photo">
-                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    ${showDetails ? `
-                                        <div class="flex items-center gap-2">
-                                            <button type="button" @click="detailsOpen = !detailsOpen"
-                                                    class="inline-flex items-center gap-1.5 text-sm text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors font-semibold uppercase tracking-wide">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                                                </svg>
-                                                <span x-text="detailsOpen ? 'HIDE NOTES' : 'READ IMPORTANT NOTES'"></span>
-                                                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': detailsOpen }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                                </svg>
-                                            </button>
-                                        </div>
-                                    ` : ''}
-
-                                    <!-- Existing note indicator -->
-                                    ${existingNote ? `
-                                        <div class="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                                <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"></path>
-                                            </svg>
-                                            Note added
-                                        </div>
-                                    ` : ''}
-                                </div>
-
-                                ${showDetails ? `
-                                    <div x-show="detailsOpen" x-collapse x-cloak class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        ${hasInstructions ? `
-                                            <div class="${hasMedia ? 'mb-4' : ''}">
-                                                <div class="prose dark:prose-invert prose-sm max-w-none bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                                                    ${this.formatInstructions(task.instructions)}
-                                                </div>
-                                            </div>
-                                        ` : ''}
-
-                                        ${hasMedia ? `
-                                            <div class="mt-3">
-                                                <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Reference Media:</h4>
-                                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                                    ${task.media.map(media => `
-                                                        <div class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group">
-                                                            ${media.type === 'image' ? `
-                                                                <button type="button" @click="galleryOpen = true; gallerySrc = '${media.url}'" class="block w-full">
-                                                                    <img src="${media.thumbnail || media.url}" alt="${media.caption || 'Task media'}"
-                                                                         class="w-full h-32 object-cover transition-transform group-hover:scale-105" loading="lazy" />
-                                                                </button>
-                                                            ` : `
-                                                                <video src="${media.url}" class="w-full h-32 object-cover" controls muted></video>
-                                                            `}
-                                                            ${media.caption ? `
-                                                                <span class="absolute bottom-1 left-1 text-xs px-2 py-1 rounded bg-black/60 text-white">
-                                                                    ${this.escapeHtml(media.caption.substring(0, 20))}
-                                                                </span>
-                                                            ` : ''}
-                                                        </div>
-                                                    `).join('')}
-                                                </div>
-                                            </div>
-                                        ` : ''}
                                     </div>
                                 ` : ''}
+
+                                ${hasMedia ? `
+                                    <div>
+                                        <p class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2">Reference photos:</p>
+                                        <div class="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                                            ${task.media.map(media => `
+                                                <div class="relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 group aspect-square">
+                                                    ${media.type === 'image' ? `
+                                                        <button type="button" @click="galleryOpen = true; gallerySrc = '${media.url}'" class="block w-full h-full">
+                                                            <img src="${media.thumbnail || media.url}" alt="${media.caption || 'Task media'}"
+                                                                 class="w-full h-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+                                                        </button>
+                                                    ` : `
+                                                        <video src="${media.url}" class="w-full h-full object-cover" controls muted></video>
+                                                    `}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+
+                        {{-- Bottom action bar: note indicator + action buttons --}}
+                        <div class="mt-3 pt-2 border-t border-gray-100 dark:border-gray-700/50 flex items-center justify-between ml-10">
+                            {{-- Left: note indicator --}}
+                            <div class="flex-1">
+                                ${existingNote ? `
+                                    <div class="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"></path>
+                                        </svg>
+                                        <span>Note added</span>
+                                    </div>
+                                ` : '<div></div>'}
+                            </div>
+                            
+                            {{-- Right: action icons --}}
+                            <div class="flex items-center gap-1">
+                                <button type="button" 
+                                        @click="noteModalOpen = true"
+                                        ${taskDisabled ? 'disabled' : ''}
+                                        class="p-1.5 rounded-md transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} ${existingNote ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}"
+                                        title="${existingNote ? 'Edit note' : 'Add note'}">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                </button>
+                                
+                                <button type="button" 
+                                        @click="photoModalOpen = true"
+                                        ${taskDisabled ? 'disabled' : ''}
+                                        class="p-1.5 rounded-md transition-colors ${taskDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100 dark:hover:bg-gray-700'} text-gray-400 dark:text-gray-500"
+                                        title="Upload photo">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </button>
                             </div>
                         </div>
                     </div>

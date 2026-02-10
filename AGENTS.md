@@ -83,3 +83,15 @@ php artisan serve
 - Run migrations before testing: `php artisan migrate`
 - Seed roles: `php artisan db:seed --class=SetupRolesAndPermissionsSeeder`
 - Photo processing requires GD extension with image support
+
+## Recent UI/UX Improvements (2025)
+1. **Housekeeper sidebar**: Housekeepers only see Dashboard + My Assignments (no admin items)
+2. **Sessions index redesign**: Separates upcoming vs past sessions, highlights today's sessions
+3. **Task card redesign**: Mobile-friendly, task name prominent, icons at bottom, collapsible instructions
+4. **User creation**: Admins can assign new cleaners to companies/owners for organization
+5. **Property edit**: Added "Calendar Sync" button to access Airbnb/VRBO calendar integrations
+6. **Checklist item photos**: Photos uploaded on tasks are now included in API responses
+
+## Configuration Notes
+- **Google Places**: Set `GEOCODING_PROVIDER=google` and add `GOOGLE_PLACES_API_KEY` in `.env`
+- **Calendar integrations**: Access via Properties → Edit → Calendar Sync button

@@ -23,6 +23,10 @@
                     <span class="hidden sm:inline">Property Tasks</span>
                     <span class="sm:hidden">Tasks</span>
                 </x-button>
+                <x-button variant="secondary" href="{{ route('properties.calendar-integrations.index', $property) }}" class="w-full sm:w-auto text-center whitespace-nowrap">
+                    <span class="hidden sm:inline">Calendar Sync</span>
+                    <span class="sm:hidden">Calendar</span>
+                </x-button>
             </div>
         </div>
     </x-slot>

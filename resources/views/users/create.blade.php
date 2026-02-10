@@ -94,21 +94,60 @@
                     {{-- Role --}}
                     <div>
                         <x-form.label value="Role" />
-                        <x-form.select name="role" class="w-full" required>
+                        <x-form.select name="role" class="w-full" required x-model="selectedRole">
                             <option value="">— Select Role —</option>
                             @if (auth()->user()->hasRole('admin'))
                                 <option value="admin" @selected(old('role') === 'admin')>Administrator</option>
                                 <option value="owner" @selected(old('role') === 'owner')>Owner</option>
                             @endif
+                            @if (auth()->user()->hasRole('company') && !auth()->user()->hasRole('admin'))
+                                <option value="owner" @selected(old('role') === 'owner')>Owner</option>
+                            @endif
                             <option value="housekeeper" @selected(old('role') === 'housekeeper')>Housekeeper</option>
                         </x-form.select>
-                        @if (auth()->user()->hasRole('owner') && !auth()->user()->hasRole('admin'))
+                        @if (auth()->user()->hasRole('owner') && !auth()->user()->hasRole('admin') && !auth()->user()->hasRole('company'))
                             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                                 Owners can only create housekeeper users.
                             </p>
                         @endif
                         <x-form.error :messages="$errors->get('role')" />
                     </div>
+
+                    {{-- Company/Owner Assignment (Admin only for now - companies auto-assign) --}}
+                    @if (auth()->user()->hasRole('admin'))
+                        <div x-show="selectedRole === 'housekeeper' || selectedRole === 'owner'" x-cloak>
+                            <x-form.label value="Assign to Company/Owner (optional)" />
+                            <x-form.select name="company_id" class="w-full">
+                                <option value="">— No assignment (standalone) —</option>
+                                @php
+                                    $companies = \App\Models\User::role('company')->orderBy('name')->get();
+                                    $owners = \App\Models\User::role('owner')->orderBy('name')->get();
+                                @endphp
+                                @if($companies->count() > 0)
+                                    <optgroup label="Companies">
+                                        @foreach($companies as $company)
+                                            <option value="{{ $company->id }}" @selected(old('company_id') == $company->id)>
+                                                {{ $company->name }}
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                                @if($owners->count() > 0)
+                                    <optgroup label="Owners" x-show="selectedRole === 'housekeeper'">
+                                        @foreach($owners as $owner)
+                                            <option value="{{ $owner->id }}" @selected(old('company_id') == $owner->id)>
+                                                {{ $owner->name }}
+                                            </option>
+                                        @endforeach
+                                    </optgroup>
+                                @endif
+                            </x-form.select>
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                Assigning to a company or owner helps organize users and determines their access.
+                            </p>
+                            <x-form.error :messages="$errors->get('company_id')" />
+                        </div>
+                    @endif
 
                     {{-- Password --}}
                     <div>
@@ -145,6 +184,7 @@
             return {
                 previewUrl: null,
                 dragOver: false,
+                selectedRole: '{{ old('role', '') }}',
 
                 preview(event) {
                     const file = event.target.files?.[0];

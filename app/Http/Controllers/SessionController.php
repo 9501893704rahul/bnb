@@ -15,9 +15,11 @@ class SessionController extends Controller
 {
     public function index()
     {
+        $user = Auth::user();
+        
         $sessions = CleaningSession::query()
-            ->where('housekeeper_id', Auth::id())
-            ->whereDate('scheduled_date', '<=', now()->toDateString())
+            ->where('housekeeper_id', $user->id)
+            ->with('property') // Eager load property to avoid N+1
             ->orderBy('scheduled_date', 'desc')
             ->paginate(20);
 
@@ -70,8 +72,8 @@ class SessionController extends Controller
             }
         }
 
-        // Eager-load checklist items to avoid N+1 when the view scans them
-        $session->load('checklistItems');
+        // Eager-load checklist items and their photos to avoid N+1 when the view scans them
+        $session->load('checklistItems.photos');
 
         // Load property-level tasks
         $property = $session->property;
@@ -266,6 +268,12 @@ class SessionController extends Controller
                                 'checked' => $item->checked,
                                 'note' => $item->note,
                                 'checked_at' => $item->checked_at?->toIso8601String(),
+                                'photos' => $item->photos->map(fn($p) => [
+                                    'id' => $p->id,
+                                    'url' => $p->url,
+                                    'note' => $p->note,
+                                    'captured_at' => $p->captured_at?->toIso8601String(),
+                                ])->values()->toArray(),
                             ] : null,
                         ];
                     })->values()->toArray(),
@@ -296,6 +304,12 @@ class SessionController extends Controller
                             'checked' => $item->checked,
                             'note' => $item->note,
                             'checked_at' => $item->checked_at?->toIso8601String(),
+                            'photos' => $item->photos->map(fn($p) => [
+                                'id' => $p->id,
+                                'url' => $p->url,
+                                'note' => $p->note,
+                                'captured_at' => $p->captured_at?->toIso8601String(),
+                            ])->values()->toArray(),
                         ] : null,
                     ];
                 })->values()->toArray(),
@@ -321,6 +335,12 @@ class SessionController extends Controller
                             'checked' => $item->checked,
                             'note' => $item->note,
                             'checked_at' => $item->checked_at?->toIso8601String(),
+                            'photos' => $item->photos->map(fn($p) => [
+                                'id' => $p->id,
+                                'url' => $p->url,
+                                'note' => $p->note,
+                                'captured_at' => $p->captured_at?->toIso8601String(),
+                            ])->values()->toArray(),
                         ] : null,
                     ];
                 })->values()->toArray(),
@@ -346,6 +366,12 @@ class SessionController extends Controller
                             'checked' => $item->checked,
                             'note' => $item->note,
                             'checked_at' => $item->checked_at?->toIso8601String(),
+                            'photos' => $item->photos->map(fn($p) => [
+                                'id' => $p->id,
+                                'url' => $p->url,
+                                'note' => $p->note,
+                                'captured_at' => $p->captured_at?->toIso8601String(),
+                            ])->values()->toArray(),
                         ] : null,
                     ];
                 })->values()->toArray(),
